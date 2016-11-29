@@ -30,6 +30,7 @@ const (
 const (
 	optMonochrome = 1 << iota
 	optNoSort
+	optNoIndex
 )
 
 // Output colors
@@ -58,6 +59,7 @@ func init() {
 		h += "  -m, --monochrome Monochrome (don't colorize output)\n"
 		h += "  -s, --stream     Treat each line of input as a separate JSON object\n"
 		h += "  -k, --insecure   Disable certificate validation\n"
+		h += "  -i, --no-index   Don't output indices for list members\n"
 		h += "      --no-sort    Don't sort output (faster)\n"
 		h += "      --version    Print version information\n\n"
 
@@ -88,6 +90,7 @@ func main() {
 		monochromeFlag bool
 		streamFlag     bool
 		noSortFlag     bool
+		noIndexFlag    bool
 		versionFlag    bool
 		insecureFlag   bool
 	)
@@ -100,6 +103,8 @@ func main() {
 	flag.BoolVar(&monochromeFlag, "m", false, "")
 	flag.BoolVar(&streamFlag, "s", false, "")
 	flag.BoolVar(&streamFlag, "stream", false, "")
+	flag.BoolVar(&noIndexFlag, "no-index", false, "")
+	flag.BoolVar(&noIndexFlag, "i", false, "")
 	flag.BoolVar(&noSortFlag, "no-sort", false, "")
 	flag.BoolVar(&versionFlag, "version", false, "")
 	flag.BoolVar(&insecureFlag, "k", false, "")
@@ -147,6 +152,9 @@ func main() {
 	if noSortFlag {
 		opts = opts | optNoSort
 	}
+	if noIndexFlag {
+		opts = opts | optNoIndex
+	}
 
 	// Pick the appropriate action: gron, ungron or gronStream
 	var a actionFn = gron
@@ -173,7 +181,13 @@ type actionFn func(io.Reader, io.Writer, int) (int, error)
 // of assignment statements. Possible options are optNoSort and optMonochrome
 func gron(r io.Reader, w io.Writer, opts int) (int, error) {
 
-	ss, err := statementsFromJSON(r, statement{{"json", typBare}})
+	var showIndex = true
+
+	if opts&optNoIndex > 0 {
+		showIndex = false
+	}
+
+	ss, err := statementsFromJSON(r, statement{{"json", typBare}}, showIndex)
 	if err != nil {
 		return exitFormStatements, fmt.Errorf("failed to form statements: %s", err)
 	}
@@ -201,6 +215,12 @@ func gron(r io.Reader, w io.Writer, opts int) (int, error) {
 // JSON object per line. There's a bit of code duplication from the
 // gron action, but it'd be fairly messy to combine the two actions
 func gronStream(r io.Reader, w io.Writer, opts int) (int, error) {
+
+	var showIndex = true
+
+	if opts&optNoIndex > 0 {
+		showIndex = false
+	}
 
 	// Helper function to make the prefix statements for each line
 	makePrefix := func(index int) statement {
@@ -233,7 +253,7 @@ func gronStream(r io.Reader, w io.Writer, opts int) (int, error) {
 
 		line := bytes.NewBuffer(sc.Bytes())
 
-		ss, err := statementsFromJSON(line, makePrefix(i))
+		ss, err := statementsFromJSON(line, makePrefix(i), showIndex)
 		i++
 		if err != nil {
 			return exitFormStatements, fmt.Errorf("failed to form statements: %s", err)

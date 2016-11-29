@@ -32,7 +32,7 @@ func TestStatementsSimple(t *testing.T) {
 		"id": 66912849
 	}`)
 
-	ss, err := statementsFromJSON(bytes.NewReader(j), statement{{"json", typBare}})
+	ss, err := statementsFromJSON(bytes.NewReader(j), statement{{"json", typBare}}, true)
 
 	if err != nil {
 		t.Errorf("Want nil error from makeStatementsFromJSON() but got %s", err)
@@ -128,7 +128,7 @@ func BenchmarkFill(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		ss := make(statements, 0)
-		ss.fill(statement{{"json", typBare}}, top)
+		ss.fill(statement{{"json", typBare}}, top, true)
 	}
 }
 

@@ -78,6 +78,18 @@ func (s statement) withNumericKey(k int) statement {
 	)
 }
 
+// withNoNumericKey returns a copy of a statement with a new
+// numeric key token appended to it
+func (s statement) withNoNumericKey() statement {
+	new := make(statement, len(s), len(s)+2)
+	copy(new, s)
+	return append(
+		new,
+		token{"[", typLBrace},
+		token{"]", typRBrace},
+	)
+}
+
 // statements is a list of assignment statements.
 // E.g statement: json.foo = "bar";
 type statements []statement
@@ -225,7 +237,7 @@ func (ss statements) Contains(search statement) bool {
 
 // statementsFromJSON takes an io.Reader containing JSON
 // and returns statements or an error on failure
-func statementsFromJSON(r io.Reader, prefix statement) (statements, error) {
+func statementsFromJSON(r io.Reader, prefix statement, showIndex bool) (statements, error) {
 	var top interface{}
 	d := json.NewDecoder(r)
 	d.UseNumber()
@@ -234,13 +246,13 @@ func statementsFromJSON(r io.Reader, prefix statement) (statements, error) {
 		return nil, err
 	}
 	ss := make(statements, 0, 32)
-	ss.fill(prefix, top)
+	ss.fill(prefix, top, showIndex)
 	return ss, nil
 }
 
 // fill takes a prefix statement and some value and recursively fills
 // the statement list using that value
-func (ss *statements) fill(prefix statement, v interface{}) {
+func (ss *statements) fill(prefix statement, v interface{}, showIndex bool) {
 
 	// Add a statement for the current prefix and value
 	ss.addWithValue(prefix, valueTokenFromInterface(v))
@@ -252,17 +264,24 @@ func (ss *statements) fill(prefix statement, v interface{}) {
 		// It's an object
 		for k, sub := range vv {
 			if validIdentifier(k) {
-				ss.fill(prefix.withBare(k), sub)
+				ss.fill(prefix.withBare(k), sub, showIndex)
 			} else {
-				ss.fill(prefix.withQuotedKey(k), sub)
+				ss.fill(prefix.withQuotedKey(k), sub, showIndex)
 			}
 		}
 
 	case []interface{}:
 		// It's an array
-		for k, sub := range vv {
-			ss.fill(prefix.withNumericKey(k), sub)
+		if showIndex {
+			for k, sub := range vv {
+				ss.fill(prefix.withNumericKey(k), sub, showIndex)
+			}
+		} else {
+			for _, sub := range vv {
+				ss.fill(prefix.withNoNumericKey(), sub, showIndex)
+			}
 		}
+
 	}
 
 }
