@@ -28,7 +28,7 @@ const (
 
 // Option bitfields
 const (
-	optMonochrome = iota + 1
+	optMonochrome = 1 << iota
 	optNoSort
 )
 
